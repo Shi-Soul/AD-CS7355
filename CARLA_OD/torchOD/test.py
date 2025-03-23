@@ -13,7 +13,10 @@ from PIL import Image
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-CARLA_CLASSES = ['background', 'motorbike', 'pedestrian', 'traffic_light', 'traffic_sign', 'vehicle', 'bike']
+
+import sys 
+sys.path.append(os.path.dirname(__file__))
+from cfg import *
 
 # Define the dataset class
 class YOLODataset(Dataset):
@@ -81,10 +84,6 @@ class YOLODataset(Dataset):
     def __len__(self):
         return len(self.imgs)
 
-transforms_val = v2.Compose([
-    v2.Resize((640,640)),
-    v2.SanitizeBoundingBoxes(), #移除退化的boundingbox
-])
 # 检查CUDA是否可用，并设置设备
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")

@@ -11,8 +11,9 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-# 定义检测类别
-CARLA_CLASSES = ['background', 'motorbike', 'pedestrian', 'traffic_light', 'traffic_sign', 'vehicle', 'bike']
+import sys 
+sys.path.append(os.path.dirname(__file__))
+from cfg import *
 
 # 定义设备
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

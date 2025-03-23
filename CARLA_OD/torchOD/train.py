@@ -11,6 +11,10 @@ from torchvision.transforms import v2, ToTensor
 from torch.utils.data import DataLoader, Dataset
 from torchmetrics.detection import MeanAveragePrecision
 
+import sys 
+sys.path.append(os.path.dirname(__file__))
+from cfg import *
+
 CARLA_CLASSES = ['background', 'motorbike', 'pedestrian', 'traffic_light', 'traffic_sign', 'vehicle', 'bike']
 
 
@@ -87,20 +91,6 @@ class YOLODataset(Dataset):
 # https://pytorch.org/vision/stable/auto_examples/transforms/plot_transforms_e2e.html#sphx-glr-auto-examples-transforms-plot-transforms-e2e-py
 # https://pytorch.org/vision/stable/transforms.html
 
-transforms = v2.Compose([
-    v2.Resize((640,640)),
-    # TODO:
-
-
-    # 
-    v2.SanitizeBoundingBoxes(), #移除退化的boundingbox
-])
-
-# 验证集的transform仅进行resize即可
-transforms_val = v2.Compose([
-    v2.Resize((640,640)),
-    v2.SanitizeBoundingBoxes(), #移除退化的boundingbox
-])
 # 检查CUDA是否可用，并设置设备
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -124,7 +114,7 @@ model.roi_heads.box_predictor = torchvision.models.detection.faster_rcnn.FastRCN
 # Define the optimizer
 # 你可以尝试其他的学习率等参数
 # 你也可以尝试其他的optimizer，比如Adam，RMSprop等
-optimizer = torch.optim.sgd.SGD(model.parameters(), lr=0.0005, momentum=0.9, weight_decay=0.0005)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.0005, momentum=0.9, weight_decay=0.0005) #type:ignore
 
 # 将模型移动到指定设备
 model.to(device)
