@@ -1,0 +1,7 @@
+*.tar.gz
+*.zip
+*.pth
+*dataset*
+CARLA_OD/torchOD/testimg
+CARLA_OD/torchOD/test_output3
+*.pdf
