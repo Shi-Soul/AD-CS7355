@@ -61,6 +61,7 @@ for image_name in os.listdir(image_folder):
     try:
         img = Image.open(image_path).convert("RGB")
         img_tensor = ToTensor()(img).to(device)
+        # img_tensor = transforms_val(img_tensor)
         with torch.no_grad():
             prediction = model([img_tensor])
         pprint(prediction)
