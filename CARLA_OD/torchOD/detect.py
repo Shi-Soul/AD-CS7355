@@ -24,7 +24,7 @@ num_classes = 7  # 6 classes + background
 in_features = model.roi_heads.box_predictor.cls_score.in_features
 model.roi_heads.box_predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(in_features, num_classes)
 # 加载你的训练权重
-model.load_state_dict(torch.load("my_weight5.pth"))
+model.load_state_dict(torch.load("my_weight49.pth"))
 model.to(device)
 model.eval()
 

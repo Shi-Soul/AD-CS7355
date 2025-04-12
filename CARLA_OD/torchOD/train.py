@@ -1,3 +1,4 @@
+import time
 import os
 import numpy as np
 from PIL import Image
@@ -13,7 +14,7 @@ from torchmetrics.detection import MeanAveragePrecision
 
 import sys 
 sys.path.append(os.path.dirname(__file__))
-from cfg import CARLA_CLASSES, transforms, transforms_val, YOLODataset
+from cfg import CARLA_CLASSES, transforms, transforms_val, YOLODataset, TRAIN_BATCHSIZE
 
 
 
@@ -35,7 +36,7 @@ print(f"{len(train_dataset)=} \t | {len(val_dataset)=}")
 
 # Define the data loaders
 # 可手动调整batch_size大小，如果爆显存了，请适当调小batch_size
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, collate_fn=lambda x: tuple(zip(*x)))
+train_loader = DataLoader(train_dataset, batch_size=TRAIN_BATCHSIZE, shuffle=True, collate_fn=lambda x: tuple(zip(*x)))
 val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: tuple(zip(*x)))
 
 # 使用采用ResNet50作为backbone的FasterRCNN模型
@@ -58,7 +59,7 @@ model.to(device)
 
 # Training and validation loop
 begin_epoch = 0
-num_epochs = 10
+num_epochs = 50
 train_losses = []
 
 # 定义评测指标
@@ -69,6 +70,7 @@ train_losses = []
 map_metric = MeanAveragePrecision(box_format='xyxy',iou_type='bbox',class_metrics=True)
 
 for epoch in range(num_epochs):
+    t1 = time.time()
     print(f"Epoch {epoch+begin_epoch}/{num_epochs+begin_epoch} Training...")
     model.train()
     train_loss = 0
@@ -90,7 +92,8 @@ for epoch in range(num_epochs):
         train_loss += losses.item()
     train_loss /= len(train_loader)
     train_losses.append(train_loss)
-
+    
+    t2 = time.time()
     print(f"Epoch {epoch+begin_epoch}/{num_epochs+begin_epoch} Evaluating...")
     # Validation，切换为评测模式
     model.eval() 
@@ -101,12 +104,15 @@ for epoch in range(num_epochs):
             prediction = model(images)
             mAP=map_metric(prediction,targets)
 
+
     # 计算总mAP
     total_mAP=map_metric.compute()
     # pprint(total_mAP) #可以看到更详细的mAP指标，如map_50,map_75,map_class等
-    print(f"Epoch {epoch+begin_epoch}/{num_epochs+begin_epoch}, Train Loss: {train_loss:.6f}, Validation mAP: {total_mAP['map'].item():.6f}")
+    t3 = time.time()
+    print(f"Epoch {epoch+begin_epoch}/{num_epochs+begin_epoch}, Train Loss: {train_loss:.6f}, Validation mAP: {total_mAP['map'].item():.6f}, Train Time: {t2-t1:.2f}s, Eval Time: {t3-t2:.2f}s")
     # 重置评测metric
     map_metric.reset()
 # Save the model weights
-torch.save(model.state_dict(), "my_weight"+str(begin_epoch+num_epochs)+".pth")
+    if epoch % 5 == 0 or epoch == num_epochs-1:
+        torch.save(model.state_dict(), "my_weight"+str(begin_epoch+epoch)+".pth")
 

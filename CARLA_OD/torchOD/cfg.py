@@ -18,12 +18,16 @@ from torchmetrics.detection import MeanAveragePrecision
 
 CARLA_CLASSES = ['background', 'motorbike', 'pedestrian', 'traffic_light', 'traffic_sign', 'vehicle', 'bike']
 
+TRAIN_BATCHSIZE = 4
+
 transforms = v2.Compose([
     v2.Resize((640,640)),
     # v2.RandomResizedCrop(size=(640,640), antialias=True),
     # TODO:
-    v2.RandomHorizontalFlip(p=0.5),
-    # v2.RandomPhotometricDistort(p=1),
+    # v2.RandomHorizontalFlip(p=0.5),
+    # v2.RandomPhotometricDistort(p=0.5),
+    # v2.RandomZoomOut(fill={tv_tensors.Image: (123, 117, 104), "others": 0}),
+    v2.RandomIoUCrop(),
 
 
     # 
