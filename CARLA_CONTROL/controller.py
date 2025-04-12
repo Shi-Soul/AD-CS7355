@@ -122,7 +122,7 @@ class CustomLongitudinalController:
 
 
 class CustomLateralController:
-    def __init__(self, vehicle, k_yaw=1.0, k_cross=5, k_soft=0.1, max_steer=0.8):
+    def __init__(self, vehicle, k_yaw=1.0, k_cross=5, k_soft=0.1, max_steer=0.4):
         self._vehicle = vehicle
         self.k_yaw = k_yaw  # 航向误差增益
         self.k_cross = k_cross  # 交叉误差增益
@@ -181,6 +181,13 @@ class CustomLateralController:
             cross_track_error *= -1
         cross_track_error = np.clip(cross_track_error, -1, 1)
 
+        # Smooth the cross track error
+        # smoothing_factor = 0.1  # Adjust this factor for more or less smoothing
+        # if not hasattr(self, 'prev_cross_track_error'):
+        #     self.prev_cross_track_error = cross_track_error
+        # cross_track_error = smoothing_factor * cross_track_error + (1 - smoothing_factor) * self.prev_cross_track_error
+        # self.prev_cross_track_error = cross_track_error  # Update previous cross track error
+
         # Stanley控制公式
         heading_error = (path_angle - vehicle_yaw) % (2 * np.pi)
         if heading_error > np.pi:
@@ -189,6 +196,12 @@ class CustomLateralController:
             heading_error *= -1
 
         steer_angle = self.k_yaw * heading_error + np.arctan2(self.k_cross * cross_track_error, self.k_soft + current_speed*1)
+
+        smoothing_factor = 1.0  # Adjust this factor for more or less smoothing
+        if not hasattr(self, 'prev_steer_angle'):
+            self.prev_steer_angle = steer_angle
+        steer_angle = smoothing_factor * steer_angle + (1 - smoothing_factor) * self.prev_steer_angle
+        self.prev_steer_angle = steer_angle  # Update previous steer angle
 
         # steer_angle*=-1
         # 限制转向范围
