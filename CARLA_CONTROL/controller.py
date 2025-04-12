@@ -58,6 +58,7 @@ class Controller:
         :param waypoints: The waypoints to follow, each waypoint is a carla.Waypoint object.
         :return: A carla.VehicleControl object containing the control commands for the vehicle.
         """
+        # breakpoint()
         acceleration = self._lon_controller.run_step(
             target_speed
         )  # Get acceleration from longitudinal controller
@@ -95,61 +96,93 @@ class Controller:
 
 
 class CustomLongitudinalController:
-    """
-    Custom longitudinal controller for controlling the vehicle's speed.
-
-    Attributes:
-        vars (CUtils): Utility object for managing persistent variables.
-    """
-
-    def __init__(self, vehicle):
-        """
-        Initializes the CustomLongitudinalController.
-
-        :param vehicle: The vehicle object to control.
-        """
-        self.vars = CUtils()
-        # DECLARE USAGE VARIABLES HERE (Use self.vars.create_var(<variable name>, <default value>) to create a persistent variable.)
+    def __init__(self, vehicle, Kp=0.5, Ki=0.01, Kd=0.1, dt=0.1):
+        self._vehicle = vehicle
+        self.Kp = Kp  # 比例增益
+        self.Ki = Ki  # 积分增益
+        self.Kd = Kd  # 微分增益
+        self.dt = dt  # 控制周期（秒）
+        self.integral = 0
+        self.prev_error = 0
 
     def run_step(self, target_speed):
-        """
-        Executes one step of the longitudinal control logic to adjust the vehicle's speed.
+        current_speed = get_speed(self._vehicle)  # 当前速度（km/h）
+        error = target_speed - current_speed  # 速度误差
+        # print(f"Speed: error {error:.2f} km/h \t| {current_speed:.2f} km/h \t| {target_speed:.2f} km/h")  # Print current speed with formatting
 
-        :param target_speed: The desired speed for the vehicle to maintain in km/h.
-        :return: Throttle/brake control in the range [-1, 1], where:
-            -1 represents maximum braking,
-            1 represents maximum acceleration.
+        # PID计算
+        self.integral += error * self.dt
+        derivative = (error - self.prev_error) / self.dt
+        acceleration = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+        self.prev_error = error
 
-        """
-        # Your Custom Longitudinal Control Logic Here
-        pass
+        # 限制输出范围 [-1, 1]
+        return np.clip(acceleration, -1.0, 1.0)
 
 
 class CustomLateralController:
-    """
-    Custom lateral controller for controlling the vehicle's steering.
-
-    Attributes:
-        vars (CUtils): Utility object for managing persistent variables.
-    """
-
-    def __init__(self, vehicle):
-        """
-        Initializes the CustomLateralController.
-
-        :param vehicle: The vehicle object to control.
-        """
-        self.vars = CUtils()
-        # DECLARE USAGE VARIABLES HERE (Use self.vars.create_var(<variable name>, <default value>) to create a persistent variable.)
+    def __init__(self, vehicle, k_gain=5, k_soft=0.1, max_steer=0.8):
+        self._vehicle = vehicle
+        self.k_gain = k_gain  # 前轮转向增益
+        self.k_soft = k_soft  # 软化系数（防止零速时奇异值）
+        self.max_steer = max_steer  # 最大转向角限制
 
     def run_step(self, waypoints):
-        """
-        Executes one step of the lateral control logic to adjust the vehicle's steering.
+        if not waypoints:
+            return 0.0
 
-        :param waypoints: A list of waypoints for the vehicle to follow, each waypoint is a carla.Waypoint object.
-        :return: steering control in the range [-1, 1] where:
-            -1 maximum steering to left
-            1 maximum steering to right
-        """
-        # Your Custom Lateral Control Logic Here
-        pass
+        # 获取车辆当前状态
+        current_speed = get_speed(self._vehicle) / 3.6  # 转为m/s
+        vehicle_transform = self._vehicle.get_transform()
+        vehicle_location = vehicle_transform.location
+        vehicle_yaw = np.radians(vehicle_transform.rotation.yaw)
+        front_axle = vehicle_location + carla.Location(
+            x=np.cos(vehicle_yaw) * 3.0,  # 假设前轴距车辆原点3m
+            y=np.sin(vehicle_yaw) * 3.0
+        )
+
+        # 找到最近路径点
+        nearest_wp, nearest_idx = self._find_nearest_waypoint(front_axle, waypoints)
+        if nearest_wp is None:
+            return 0.0
+
+        # 计算横向误差（车辆前轴到路径的垂直距离）
+        path_vector = np.array([
+            waypoints[nearest_idx + 1].transform.location.x - nearest_wp.transform.location.x,
+            waypoints[nearest_idx + 1].transform.location.y - nearest_wp.transform.location.y
+        ])
+        path_angle = np.arctan2(path_vector[1], path_vector[0])
+        vehicle_vector = np.array([
+            front_axle.x - nearest_wp.transform.location.x,
+            front_axle.y - nearest_wp.transform.location.y
+        ])
+        cross_track_error = np.linalg.norm(vehicle_vector) * np.sin(
+            np.arctan2(vehicle_vector[1], vehicle_vector[0]) - path_angle
+        )
+
+        # Stanley控制公式
+        heading_error = (path_angle - vehicle_yaw) % (2 * np.pi)
+        if heading_error > np.pi:
+            heading_error -= 2 * np.pi
+
+        steer_angle = heading_error + np.arctan2(self.k_gain * cross_track_error, self.k_soft + current_speed)
+
+        # 限制转向范围
+        print(f"Steer: {steer_angle:.2f} \t| {heading_error:.2f} \t| {cross_track_error:.2f}")
+        # breakpoint()
+        return np.clip(-steer_angle, -self.max_steer, self.max_steer)
+
+    def _find_nearest_waypoint(self, location, waypoints):
+        min_dist = float('inf')
+        nearest_wp = None
+        nearest_idx = 0
+        for i, wp in enumerate(waypoints[:-1]):
+            dist = np.sqrt(
+                (location.x - wp.transform.location.x)**2 +
+                (location.y - wp.transform.location.y)**2
+            )
+            if dist < min_dist:
+                min_dist = dist
+                nearest_wp = wp
+                nearest_idx = i
+        return nearest_wp, nearest_idx
