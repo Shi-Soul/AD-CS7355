@@ -149,25 +149,28 @@ class CustomLateralController:
             return 0.0
 
         # 计算前面多个路径点的平均横向误差
-        num_points = min(1, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
-        # num_points = min(5, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
+        # num_points = min(1, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
+        num_points = min(5, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
         path_vector_sum = np.array([0.0, 0.0])
         
-        normalize = lambda x: x / np.linalg.norm(x)
+        normalize = lambda x: x / (np.linalg.norm(x)+1e-3)
         for i in range(num_points):
             path_vector_sum += normalize(np.array([
-                waypoints[nearest_idx + i + 1].transform.location.x - nearest_wp.transform.location.x,
-                waypoints[nearest_idx + i + 1].transform.location.y - nearest_wp.transform.location.y
+                waypoints[nearest_idx + i + 1].transform.location.x - waypoints[nearest_idx + i].transform.location.x,
+                waypoints[nearest_idx + i + 1].transform.location.y - waypoints[nearest_idx + i].transform.location.y
             ]))
         
         path_vector = path_vector_sum / num_points  # 计算平均值
 
         # Smooth the path vector to avoid sudden changes
-        smoothing_factor = 0.5  # Adjust this factor for more or less smoothing
-        path_vector = smoothing_factor * path_vector + (1 - smoothing_factor) * self.prev_path_vector
-        self.prev_path_vector = path_vector  # Update previous path vector
+        # smoothing_factor = 0.5  # Adjust this factor for more or less smoothing
+        # path_vector = smoothing_factor * path_vector + (1 - smoothing_factor) * self.prev_path_vector
+        # self.prev_path_vector = path_vector  # Update previous path vector
 
         path_angle = np.arctan2(path_vector[1], path_vector[0])
+        if np.isnan(path_angle):
+            # path_angle = 0
+            breakpoint()
         vehicle_vector = np.array([
             front_axle.x - nearest_wp.transform.location.x,
             front_axle.y - nearest_wp.transform.location.y
