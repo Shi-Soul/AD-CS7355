@@ -96,7 +96,7 @@ class Controller:
 
 
 class CustomLongitudinalController:
-    def __init__(self, vehicle, Kp=1.0, Ki=0.03, Kd=0.1, dt=0.1):
+    def __init__(self, vehicle, Kp=3.0, Ki=0.01, Kd=0.3, dt=0.1):
         self._vehicle = vehicle
         self.Kp = Kp  # 比例增益
         self.Ki = Ki  # 积分增益
@@ -117,7 +117,7 @@ class CustomLongitudinalController:
         self.prev_error = error
 
         # 限制输出范围 [-1, 1]
-        # print(f"Accel: {acceleration:.2f} \t| {error:.2f} \t| {current_speed:.2f} \t| {target_speed:.2f}")
+        print(f"Accel: {acceleration:.2f} \t| {error:.2f} \t| {current_speed:.2f} \t| {target_speed:.2f}")
         return np.clip(acceleration, -1.0, 1.0)
 
 
@@ -205,7 +205,7 @@ class CustomLateralController:
 
         # steer_angle*=-1
         # 限制转向范围
-        print(f"Steer: {steer_angle=:.2f} \t| {heading_error=:.2f} \t| {cross_track_error=:.2f} \t| {vehicle_yaw=:.2f} \t| {path_angle=:.2f}")
+        # print(f"Steer: {steer_angle=:.2f} \t| {heading_error=:.2f} \t| {cross_track_error=:.2f} \t| {vehicle_yaw=:.2f} \t| {path_angle=:.2f}")
         # breakpoint()
         return np.clip(steer_angle, -self.max_steer, self.max_steer)
 
