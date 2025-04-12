@@ -96,7 +96,7 @@ class Controller:
 
 
 class CustomLongitudinalController:
-    def __init__(self, vehicle, Kp=3.0, Ki=0.01, Kd=0.3, dt=0.1):
+    def __init__(self, vehicle, Kp=3.0, Ki=0.005, Kd=0.8, dt=0.1):
         self._vehicle = vehicle
         self.Kp = Kp  # 比例增益
         self.Ki = Ki  # 积分增益
