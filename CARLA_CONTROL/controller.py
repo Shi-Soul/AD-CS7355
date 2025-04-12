@@ -122,7 +122,7 @@ class CustomLongitudinalController:
 
 
 class CustomLateralController:
-    def __init__(self, vehicle, k_yaw=1, k_cross=5, k_soft=0.1, max_steer=0.8):
+    def __init__(self, vehicle, k_yaw=1.0, k_cross=5, k_soft=0.1, max_steer=0.8):
         self._vehicle = vehicle
         self.k_yaw = k_yaw  # 航向误差增益
         self.k_cross = k_cross  # 交叉误差增益
@@ -149,11 +149,11 @@ class CustomLateralController:
             return 0.0
 
         # 计算前面多个路径点的平均横向误差
-        # num_points = min(1, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
-        num_points = min(5, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
-        path_vector_sum = np.array([0.0, 0.0])
+        num_points = min(1, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
+        # num_points = min(5, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
+        path_vector_sum = np.array([np.cos(vehicle_yaw), np.sin(vehicle_yaw)])*0.1
         
-        normalize = lambda x: x / (np.linalg.norm(x)+1e-3)
+        normalize = lambda x: x / (np.linalg.norm(x)+1e-6)
         for i in range(num_points):
             path_vector_sum += normalize(np.array([
                 waypoints[nearest_idx + i + 1].transform.location.x - waypoints[nearest_idx + i].transform.location.x,
@@ -175,19 +175,22 @@ class CustomLateralController:
             front_axle.x - nearest_wp.transform.location.x,
             front_axle.y - nearest_wp.transform.location.y
         ])
-        cross_track_error = np.linalg.norm(vehicle_vector) * np.sin(
-            np.arctan2(vehicle_vector[1], vehicle_vector[0]) - path_angle
-        )
+        _proj_angle = np.arctan2(vehicle_vector[1], vehicle_vector[0]) - path_angle
+        cross_track_error = np.linalg.norm(vehicle_vector) * np.sin(_proj_angle)
+        if np.cos(_proj_angle) < 0:
+            cross_track_error *= -1
         cross_track_error = np.clip(cross_track_error, -1, 1)
 
         # Stanley控制公式
         heading_error = (path_angle - vehicle_yaw) % (2 * np.pi)
         if heading_error > np.pi:
             heading_error -= 2 * np.pi
+        if np.cos(heading_error) < 0:
+            heading_error *= -1
 
-        steer_angle = -self.k_yaw * heading_error + np.arctan2(self.k_cross * cross_track_error, self.k_soft + current_speed)
+        steer_angle = self.k_yaw * heading_error + np.arctan2(self.k_cross * cross_track_error, self.k_soft + current_speed*1)
 
-        steer_angle*=-1
+        # steer_angle*=-1
         # 限制转向范围
         print(f"Steer: {steer_angle=:.2f} \t| {heading_error=:.2f} \t| {cross_track_error=:.2f} \t| {vehicle_yaw=:.2f} \t| {path_angle=:.2f}")
         # breakpoint()
