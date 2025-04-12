@@ -96,7 +96,7 @@ class Controller:
 
 
 class CustomLongitudinalController:
-    def __init__(self, vehicle, Kp=0.5, Ki=0.01, Kd=0.1, dt=0.1):
+    def __init__(self, vehicle, Kp=1.0, Ki=0.03, Kd=0.1, dt=0.1):
         self._vehicle = vehicle
         self.Kp = Kp  # 比例增益
         self.Ki = Ki  # 积分增益
@@ -117,15 +117,18 @@ class CustomLongitudinalController:
         self.prev_error = error
 
         # 限制输出范围 [-1, 1]
+        # print(f"Accel: {acceleration:.2f} \t| {error:.2f} \t| {current_speed:.2f} \t| {target_speed:.2f}")
         return np.clip(acceleration, -1.0, 1.0)
 
 
 class CustomLateralController:
-    def __init__(self, vehicle, k_gain=5, k_soft=0.1, max_steer=0.8):
+    def __init__(self, vehicle, k_yaw=1, k_cross=5, k_soft=0.1, max_steer=0.8):
         self._vehicle = vehicle
-        self.k_gain = k_gain  # 前轮转向增益
+        self.k_yaw = k_yaw  # 航向误差增益
+        self.k_cross = k_cross  # 交叉误差增益
         self.k_soft = k_soft  # 软化系数（防止零速时奇异值）
         self.max_steer = max_steer  # 最大转向角限制
+        self.prev_path_vector = np.array([0.0, 0.0])  # Initialize previous path vector for smoothing
 
     def run_step(self, waypoints):
         if not waypoints:
@@ -140,17 +143,30 @@ class CustomLateralController:
             x=np.cos(vehicle_yaw) * 3.0,  # 假设前轴距车辆原点3m
             y=np.sin(vehicle_yaw) * 3.0
         )
-
         # 找到最近路径点
         nearest_wp, nearest_idx = self._find_nearest_waypoint(front_axle, waypoints)
-        if nearest_wp is None:
+        if nearest_wp is None or nearest_idx + 1 >= len(waypoints):
             return 0.0
 
-        # 计算横向误差（车辆前轴到路径的垂直距离）
-        path_vector = np.array([
-            waypoints[nearest_idx + 1].transform.location.x - nearest_wp.transform.location.x,
-            waypoints[nearest_idx + 1].transform.location.y - nearest_wp.transform.location.y
-        ])
+        # 计算前面多个路径点的平均横向误差
+        num_points = min(1, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
+        # num_points = min(5, len(waypoints) - nearest_idx - 1)  # 取前5个点或可用的点数
+        path_vector_sum = np.array([0.0, 0.0])
+        
+        normalize = lambda x: x / np.linalg.norm(x)
+        for i in range(num_points):
+            path_vector_sum += normalize(np.array([
+                waypoints[nearest_idx + i + 1].transform.location.x - nearest_wp.transform.location.x,
+                waypoints[nearest_idx + i + 1].transform.location.y - nearest_wp.transform.location.y
+            ]))
+        
+        path_vector = path_vector_sum / num_points  # 计算平均值
+
+        # Smooth the path vector to avoid sudden changes
+        smoothing_factor = 0.5  # Adjust this factor for more or less smoothing
+        path_vector = smoothing_factor * path_vector + (1 - smoothing_factor) * self.prev_path_vector
+        self.prev_path_vector = path_vector  # Update previous path vector
+
         path_angle = np.arctan2(path_vector[1], path_vector[0])
         vehicle_vector = np.array([
             front_axle.x - nearest_wp.transform.location.x,
@@ -159,18 +175,20 @@ class CustomLateralController:
         cross_track_error = np.linalg.norm(vehicle_vector) * np.sin(
             np.arctan2(vehicle_vector[1], vehicle_vector[0]) - path_angle
         )
+        cross_track_error = np.clip(cross_track_error, -1, 1)
 
         # Stanley控制公式
         heading_error = (path_angle - vehicle_yaw) % (2 * np.pi)
         if heading_error > np.pi:
             heading_error -= 2 * np.pi
 
-        steer_angle = heading_error + np.arctan2(self.k_gain * cross_track_error, self.k_soft + current_speed)
+        steer_angle = -self.k_yaw * heading_error + np.arctan2(self.k_cross * cross_track_error, self.k_soft + current_speed)
 
+        steer_angle*=-1
         # 限制转向范围
-        print(f"Steer: {steer_angle:.2f} \t| {heading_error:.2f} \t| {cross_track_error:.2f}")
+        print(f"Steer: {steer_angle=:.2f} \t| {heading_error=:.2f} \t| {cross_track_error=:.2f} \t| {vehicle_yaw=:.2f} \t| {path_angle=:.2f}")
         # breakpoint()
-        return np.clip(-steer_angle, -self.max_steer, self.max_steer)
+        return np.clip(steer_angle, -self.max_steer, self.max_steer)
 
     def _find_nearest_waypoint(self, location, waypoints):
         min_dist = float('inf')
