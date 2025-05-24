@@ -5,12 +5,6 @@ import matplotlib.pyplot as plt
 import json
 
 class OccupancyGrid:
-    def __repr__(self):
-        """
-        返回网格地图的字符串表示形式。
-        """
-        return f"OccupancyGrid(grid_size={self.grid_size}, resolution={self.resolution}, center_position={self.center_position}, shape={self.occupancy_grid.shape})"
-    
     def __init__(self, grid_size, resolution, center_position):
         """
         创建网格地图

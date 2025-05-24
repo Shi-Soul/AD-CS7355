@@ -11,7 +11,22 @@ from typing import Tuple, List, Dict, Any
 # 航向网格分辨率
 YAW_GRID_RESOLUTION = np.deg2rad(5.0)
 
+def rad_wrap(angle: float) -> float:
+    """
+    将角度归一化到[-pi, pi]范围内。
+    
+    Args:
+        angle: 输入角度（弧度制）
+    
+    Returns:
+        float: 归一化后的角度
+    """
+    return (angle + math.pi) % (2 * math.pi) - math.pi
+
 class Node:
+    def __repr__(self) -> str:
+        return f"Node(x={self.x}, y={self.y}, heading={self.heading}, g_cost={self.g_cost}, h_cost={self.h_cost}, predecssor={self.predecssor})"
+    
     def __init__(self, x, y, heading, g_cost = 0, h_cost = 0, predecssor = None) -> None:
         self.x = x
         self.y = y
@@ -19,6 +34,7 @@ class Node:
         self.g_cost = g_cost # 已经走过的路径代价（实际值）
         self.h_cost = h_cost # 到目标的估计代价（启发式值）
         self.predecssor = predecssor
+        assert -math.pi <= heading <= math.pi, "Heading must be in the range [-pi, pi]"
         
     def CalIndex1DWithAngle(self, width, height):
         min_heading = round(-math.pi / YAW_GRID_RESOLUTION) - 1
@@ -44,18 +60,29 @@ def GenerateSuccessors(node: Node, node_id: int) -> List[Node]:
     """
     successors = []
     
-    # TODO: 定义转向空间
-    dela_thetas = [] # 角度值，例如 [-30, -15, 0, 15, 30] 角度制 注意转换为弧度制，同时delta_theta需要为YAW_GRID_RESOLUTION的倍数
+    # 定义转向空间
+    # dela_thetas = [] # 角度值，例如 [-30, -15, 0, 15, 30] 角度制 注意转换为弧度制，同时delta_theta需要为YAW_GRID_RESOLUTION的倍数
+    delta_thetas = np.arange(-math.pi/2, math.pi/2 + 1e-6, 3* YAW_GRID_RESOLUTION)
+    # delta_thetas = np.arange(-math.pi, math.pi + 1e-6, YAW_GRID_RESOLUTION)
     
-    for delta_theta in dela_thetas:
-        # TODO: 生成后继节点
+    for delta_theta in delta_thetas:
+        #  生成后继节点
         distance = 5.0 # 移动距离
         # 1. 计算新的位置和航向(new_x, new_y, new_theta)
+        new_theta = rad_wrap(node.heading + delta_theta)  # 确保航向在[-pi, pi]范围内
+        new_x = node.x + distance * math.cos(new_theta)
+        new_y = node.y + distance * math.sin(new_theta)
+        
         
         # 2. 计算新节点的g_cost（new_g_cost根据路径长度，假如delta_theta不为0，则需要乘以一个转弯的惩罚系数如1.5）
+        new_node = Node(new_x, new_y, new_theta)
+        new_g_cost = node.g_cost + CalDubinPathCost(node, new_node)  # 使用Dubins路径代价
+        new_node.g_cost = new_g_cost
+        new_node.h_cost = node.h_cost  # 保持h_cost不变，后续会更新
+        new_node.predecssor = node_id  # 设置前驱节点为当前节点
         
         # 3. 创建新的后继节点
-        successors.append(Node(new_x, new_y, new_theta, new_g_cost, node.h_cost, node_id))
+        successors.append(new_node)
     return successors
 
 def CalAStarPathCost(start_node: Node, h_map: dict, occupancy_map: occupancy_grid.OccupancyGrid) -> float:
@@ -88,7 +115,7 @@ def CalDubinPathCost(start_node: Node, goal_node: Node) -> float:
     Returns:
         float: Dubins路径代价，如果找不到有效路径则返回无穷大
     """
-    #TODO: path = dubins.shortest_path(q0, q1, turning_radius), 你可以通过调节第三个参数控制转弯半径
+    # path = dubins.shortest_path(q0, q1, turning_radius), 你可以通过调节第三个参数控制转弯半径
     dubins_path = dubins.shortest_path((start_node.x, start_node.y, start_node.heading),
                                        (goal_node.x, goal_node.y, goal_node.heading), 
                                        1.0)
@@ -112,7 +139,7 @@ def CalHCost(start_node: Node, goal_node: Node, h_map: dict, occupancy_map: occu
     return max(astar_cost, dubin_cost)
 
 def DubinShot(start_node: Node, goal_node: Node, occupancy_map: occupancy_grid.OccupancyGrid) -> Tuple[bool, List[Any]]:
-    #TODO: path = dubins.shortest_path(q0, q1, turning_radius), 你可以通过调节第三个参数控制转弯半径
+    # path = dubins.shortest_path(q0, q1, turning_radius), 你可以通过调节第三个参数控制转弯半径
     dubins_path = dubins.shortest_path((start_node.x, start_node.y, start_node.heading),
                                        (goal_node.x, goal_node.y, goal_node.heading), 
                                        1.0)
@@ -185,19 +212,47 @@ class PathFindingAlgorithm:
         pq = []
         pq.append((0, goal_node_idx_1d))
         
-        while 1:
-            # TODO: 在占用图中扩展所有节点并将其g_cost存储在closedset中
+        while pq:
             # 1. 从优先队列pq中取出f值最小的节点
-            # 2. 如果队列为空，返回closedset
+            g_cost, current_node_id = heappop(pq)
+            if current_node_id in closedset:
+                continue
+            # breakpoint()
             # 3. 将节点从openset移到closedset
+            current_node = openset.pop(current_node_id)
+            closedset[current_node_id] = current_node
+            
             # 4. 遍历所有可能的移动方向
             #    - 跳过障碍物 (occupancy_map.is_occupied(node.CalIndex2D()))
             #    - 跳过超出occupancy map边界的节点 (not occupancy_map.is_inside(node.CalIndex2D()))
             #    - 跳过已拓展过的节点
             # 5. 计算新节点的代价并更新openset和pq
-            pass
-        
-        return closedset
+            
+            for dx, dy, move_cost in motion:
+                next_x = current_node.x + dx
+                next_y = current_node.y + dy
+                next_node = Node(next_x, next_y, 0) 
+                
+
+                if not occupancy_map.is_inside(next_node.CalIndex2D()):
+                    continue
+                if occupancy_map.is_occupied(next_node.CalIndex2D()):
+                    continue
+                
+                
+                next_node_id = next_node.CalIndex1D(map_width, map_height)
+                if next_node_id in closedset:
+                    continue
+
+                new_g_cost = current_node.g_cost + move_cost
+                if next_node_id not in openset or new_g_cost < openset[next_node_id].g_cost:
+                    next_node.g_cost = new_g_cost
+                    next_node.predecssor = current_node_id 
+                    openset[next_node_id] = next_node
+                    heappush(pq, (new_g_cost, next_node_id))
+            
+        # breakpoint()        
+        return {id: node.g_cost for id,node in closedset.items()}
         
     def HybridAStar(self, start_node: Node, goal_node: Node, occupancy_map: occupancy_grid.OccupancyGrid) -> List[Tuple[float, float, float]]:
         """
@@ -226,9 +281,10 @@ class PathFindingAlgorithm:
         # 包含已扩展过的节点，用于防止重复探索和路径重建（从目标回溯到起点）
         closedList = {}
         
-        # 3. TODO: 使用A*生成启发式地图
+        # 3. 使用A*生成启发式地图
         h_map = self.holonomic_heuristic_Astar(goal_node, occupancy_map)
         
+
         # 计算节点代价的函数
         def cal_cost(node: Node, goal_node: Node, h_map: dict, occupancy_map: occupancy_grid.OccupancyGrid) -> float:
             """
@@ -253,19 +309,32 @@ class PathFindingAlgorithm:
         pq = [] 
         
         start_node_id = start_node.CalIndex1DWithAngle(map_width, map_height)
+        start_node.h_cost = CalHCost(start_node, goal_node, h_map, occupancy_map)
         openList[start_node_id] = start_node
-        heappush(pq, (cal_cost(start_node, goal_node, h_map), start_node_id))
+        heappush(pq, (cal_cost(start_node, goal_node, h_map, occupancy_map), start_node_id))
 
-        current = None
-        c_id = None
-        dubin_path = []
+        # current = None
+        # c_id = None
+        # dubin_path = []
+        # breakpoint()
 
         while True:
-            # 5. TODO: 如果openList为空，返回空路径
+            # 5. 如果openList为空，返回空路径
             # 如果openList为空，表示无法找到路径，返回空列表(return [])
+            if not openList:
+                breakpoint()
+                return []
             
-            # 6. TODO: 获取f值最小的下一个待扩展节点
+            
+            # 6. 获取f值最小的下一个待扩展节点
             # 从优先队列中取出f值最小的节点作为当前节点
+            f_cost, c_id = heappop(pq)
+            if c_id not in openList:
+                # breakpoint()
+                # return []
+                continue
+            current = openList.pop(c_id)
+            closedList[c_id] = current
             
             # 7. 检查当前节点是否可以直接连接到目标节点（通过dubinshot或其他算法）
             # 检查当前节点是否可以直接连接到目标节点
@@ -273,19 +342,32 @@ class PathFindingAlgorithm:
             if success:
                 break
             
-            # 8. TODO: 生成后继节点
+            # 8. 生成后继节点
             for successor in GenerateSuccessors(current, c_id):
+                if not occupancy_map.is_inside(successor.CalIndex2D()):
+                    continue
                 successor_idx_1d = successor.CalIndex1DWithAngle(map_width, map_height)
 
-                # 9. TODO: 如果后继节点已经在闭集中，跳过它
+                # 9. 如果后继节点已经在闭集中，跳过它
                 # 如果后继节点已经在闭集中，跳过
+                if successor_idx_1d in closedList:
+                    continue
                     
-                # 10. TODO: 如果后继节点与障碍物碰撞，跳过它
+                # 10. 如果后继节点与障碍物碰撞，跳过它
                 # 使用collision_checker检查后继节点是否与障碍物碰撞
+                successor_tuple = (successor.x, successor.y, successor.heading)
+                if not collision_checker_.collision_check(successor_tuple, occupancy_map):
+                    continue
                 
-                # 11. TODO: 如果找到更好的路径或节点不在开集中，则将后继节点加入开集
+                # 11. 如果找到更好的路径或节点不在开集中，则将后继节点加入开集
                 # 如果找到更好的路径或节点不在开集中，更新/添加节点到开集与队列中
-        
+                successor.h_cost = CalHCost(successor, goal_node, h_map, occupancy_map)
+                f_cost = cal_cost(successor, goal_node, h_map, occupancy_map)
+                if successor_idx_1d not in openList or f_cost < openList[successor_idx_1d].g_cost + openList[successor_idx_1d].h_cost:
+                    openList[successor_idx_1d] = successor
+                    heappush(pq, (f_cost, successor_idx_1d))
+                
+        # breakpoint()
         # 12. TODO: 定义从起始节点到目标节点获取最终路径的函数
         def get_final_path(closed_set: Dict[int, Node], dubin_path: List[Any], current_node: Node) -> List[Tuple[float, float, float]]:
             """
@@ -299,18 +381,26 @@ class PathFindingAlgorithm:
             Returns:
                 list: 完整路径点列表
             """
+            keynodes =[]
             path = []
             
-            # 13. TODO: 从目标节点回溯到起始节点
+            # 13. 从目标节点回溯到起始节点
             # 从当前节点回溯到起始节点
+            keynodes.append(current_node)
             pre_node_id = current_node.predecssor
             while pre_node_id is not None:
                 # 获取前驱节点并添加到路径中
-                # 更新pre_node_id为前驱节点的前驱
+                pre_node = closed_set[pre_node_id]
+                keynodes.append(pre_node)
+                # 更新pre_node_id为前驱节点的前驱k
+                pre_node_id = pre_node.predecssor
                 pass
             
             # 14. TODO: 反转路径使其从起点开始
             # 反转路径使其从起点开始
+            for node in reversed(keynodes):
+                # 将节点添加到路径中
+                path.append((node.x, node.y, node.heading))
 
             # 15. 添加Dubins路径
             path += [(point[0], point[1], point[2]) for point in dubin_path]
