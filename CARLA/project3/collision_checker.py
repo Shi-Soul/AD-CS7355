@@ -19,7 +19,7 @@ class CollisionChecker:
         _circle_offsets: 圆心相对于车辆中心的偏移距离列表
         _search_boundary: 碰撞检测的搜索边界
     """
-    def __init__(self, circle_offsets = [-2.0, 0.0, 2.0], search_boundary = 5.0):
+    def __init__(self, circle_offsets = [-2.0, 0.0, 2.0], search_boundary = 5.5):
         """
         初始化碰撞检测器。
         
@@ -30,7 +30,7 @@ class CollisionChecker:
         self._circle_offsets = circle_offsets
         self._search_boundary = search_boundary
 
-    def collision_check(self, point, occupancy_grid, circle_radii = 2.0):
+    def collision_check(self, point, occupancy_grid, circle_radii = 2.3):
       """
       检查指定点在占用栅格地图中是否无碰撞。
       

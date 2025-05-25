@@ -8,6 +8,9 @@ import carla
 from heapq import heappush, heappop
 import time
 
+RESOLUTION = 0.4 # 每个网格单元格的分辨率（米）
+GRIDLEN = 100 # 占用地图的长度和高度（米）
+
 class LocalPlanner:
     def __init__(self, global_path):
         self._global_path = global_path
@@ -15,8 +18,9 @@ class LocalPlanner:
         self._path_searcher = path_finding_algorithms.PathFindingAlgorithm()
         self._path_optimizer = path_optimizer.PathOptimizer()
         self._collision_checker = collision_checker.CollisionChecker()
-        self._resolution = 0.2 # 每个网格单元格的分辨率（米）
-        self._grid_len = 120 # 占用地图的长度和高度（米）
+        self._resolution = RESOLUTION # 每个网格单元格的分辨率（米）
+        # self._resolution = 0.2 # 每个网格单元格的分辨率（米）
+        self._grid_len = GRIDLEN # 占用地图的长度和高度（米）
         self._grid_size = round(self._grid_len / self._resolution)
         self._grid_center_x = self._grid_size // 2
         self._grid_center_y = self._grid_size // 2
@@ -76,7 +80,7 @@ class LocalPlanner:
         return closest_index
     
     # 您应该自定义自己的偏移量（偏移量需要小于60米,注意过小的偏移量会导致局部路径过短而频繁重规划）
-    def choose_goal_cell(self, ego_position, ego_heading, offset = 40.0):
+    def choose_goal_cell(self, ego_position, ego_heading, offset = 30.0):
         """
         选择占用地图中的目标单元格。
         
@@ -124,7 +128,12 @@ class LocalPlanner:
             if not self._collision_checker.collision_check(local_goal, self._occupancy_grid):
                 # 如果目标点太靠近障碍物，尝试前后调整索引
                 # for offset_index in range(1, 10):
-                refined_goal_index = goal_index + (tries // 2 + 1) * ( 2* (tries % 2) -1)
+                # refined_goal_index = goal_index + (tries // 2 + 1) * ( 2* (tries % 2) -1)
+                if goal_index-tries > current_index:
+                    refined_goal_index = goal_index - tries
+                else:
+                    refined_goal_index = goal_index + tries -(goal_index - current_index)
+                # print(f"Refining goal index to: {refined_goal_index}")                
                 tries+=1
             else:
                 # 如果目标点不太靠近障碍物，跳出循环
@@ -132,7 +141,7 @@ class LocalPlanner:
             
             if not (refined_goal_index < len(self._global_path) and refined_goal_index >= current_index):
                 print(f" Warning: Goal index {refined_goal_index} is out of bounds, using last valid index. with tries {tries}")
-                refined_goal_index = goal_index
+                refined_goal_index = len(self._global_path) - 1
                 break 
         
         

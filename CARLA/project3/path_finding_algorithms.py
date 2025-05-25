@@ -11,8 +11,10 @@ from typing import Tuple, List, Dict, Any
 # 航向网格分辨率
 YAW_GRID_RESOLUTION = np.deg2rad(5.0)
 
-DeltaThetas = np.arange(-math.pi/4, math.pi/4 + 1e-6, 3* YAW_GRID_RESOLUTION) # 转向空间
-ForwardDistance = [5.0, 10.0] # 前进距离
+DeltaThetas = np.arange(-math.pi/6, math.pi/6 + 1e-6,  2*YAW_GRID_RESOLUTION) # 转向空间
+# DeltaThetas = np.arange(-math.pi/4, math.pi/4 + 1e-6,  YAW_GRID_RESOLUTION) # 转向空间
+ForwardDistance = [4.0, 0.6] # 前进距离
+Radii = 3.0
 
 
 def rad_wrap(angle: float) -> float:
@@ -29,7 +31,7 @@ def rad_wrap(angle: float) -> float:
 
 class Node:
     def __repr__(self) -> str:
-        return f"Node(x={self.x}, y={self.y}, heading={self.heading}, g_cost={self.g_cost}, h_cost={self.h_cost}, predecssor={self.predecssor})"
+        return f"Node(x={self.x:.4f}, y={self.y:.4f}, heading={self.heading:.4f}, g_cost={self.g_cost:.4f}, h_cost={self.h_cost:.4f}, predecssor={self.predecssor})"
     
     def __init__(self, x, y, heading, g_cost = 0, h_cost = 0, predecssor = None) -> None:
         self.x = x
@@ -69,7 +71,6 @@ def GenerateSuccessors(node: Node, node_id: int) -> List[Node]:
     # delta_thetas = np.arange(-math.pi/4, math.pi/4 + 1e-6, 3* YAW_GRID_RESOLUTION)
     # delta_thetas = np.arange(-math.pi, math.pi + 1e-6, YAW_GRID_RESOLUTION)
     delta_thetas = DeltaThetas
-    ForwardDistance # 前进距离
     
     for delta_theta in delta_thetas:
         for distance in ForwardDistance:
@@ -126,7 +127,7 @@ def CalDubinPathCost(start_node: Node, goal_node: Node) -> float:
     # path = dubins.shortest_path(q0, q1, turning_radius), 你可以通过调节第三个参数控制转弯半径
     dubins_path = dubins.shortest_path((start_node.x, start_node.y, start_node.heading),
                                        (goal_node.x, goal_node.y, goal_node.heading), 
-                                       1.0)
+                                       Radii)
     dubins_cost = dubins_path.path_length()
     return dubins_cost
     
@@ -150,7 +151,7 @@ def DubinShot(start_node: Node, goal_node: Node, occupancy_map: occupancy_grid.O
     # path = dubins.shortest_path(q0, q1, turning_radius), 你可以通过调节第三个参数控制转弯半径
     dubins_path = dubins.shortest_path((start_node.x, start_node.y, start_node.heading),
                                        (goal_node.x, goal_node.y, goal_node.heading), 
-                                       1.0)
+                                       Radii)
     points, _ = dubins_path.sample_many(2.0)
     collision_checker_ = collision_checker.CollisionChecker()
     for point in points:
@@ -320,6 +321,7 @@ class PathFindingAlgorithm:
         start_node.h_cost = CalHCost(start_node, goal_node, h_map, occupancy_map)
         openList[start_node_id] = start_node
         heappush(pq, (cal_cost(start_node, goal_node, h_map, occupancy_map), start_node_id))
+        print("start node h_cost:", start_node.h_cost)
 
         # current = None
         # c_id = None
@@ -330,8 +332,9 @@ class PathFindingAlgorithm:
             # 5. 如果openList为空，返回空路径
             # 如果openList为空，表示无法找到路径，返回空列表(return [])
             if not openList:
-                breakpoint()
-                return []
+                return [(start_node.x, start_node.y, start_node.heading), (goal_node.x, goal_node.y, goal_node.heading)]
+                # breakpoint()
+                # return []
             
             
             # 6. 获取f值最小的下一个待扩展节点
@@ -343,6 +346,8 @@ class PathFindingAlgorithm:
                 continue
             current = openList.pop(c_id)
             closedList[c_id] = current
+            
+            # print(f"DEBUG: current node: {current}\t | {f_cost=:.4f}")
             
             # 7. 检查当前节点是否可以直接连接到目标节点（通过dubinshot或其他算法）
             # 检查当前节点是否可以直接连接到目标节点
@@ -378,6 +383,7 @@ class PathFindingAlgorithm:
                 if successor_idx_1d not in openList or f_cost < openList[successor_idx_1d].g_cost + openList[successor_idx_1d].h_cost:
                     openList[successor_idx_1d] = successor
                     heappush(pq, (f_cost, successor_idx_1d))
+            # breakpoint()
                 
         # breakpoint()
         # 12. 定义从起始节点到目标节点获取最终路径的函数
