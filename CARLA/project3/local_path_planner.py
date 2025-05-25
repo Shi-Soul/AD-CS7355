@@ -76,7 +76,7 @@ class LocalPlanner:
         return closest_index
     
     # 您应该自定义自己的偏移量（偏移量需要小于60米,注意过小的偏移量会导致局部路径过短而频繁重规划）
-    def choose_goal_cell(self, ego_position, ego_heading, offset = 50.0):
+    def choose_goal_cell(self, ego_position, ego_heading, offset = 40.0):
         """
         选择占用地图中的目标单元格。
         

@@ -12,7 +12,7 @@ from typing import Tuple, List, Dict, Any
 YAW_GRID_RESOLUTION = np.deg2rad(5.0)
 
 DeltaThetas = np.arange(-math.pi/4, math.pi/4 + 1e-6, 3* YAW_GRID_RESOLUTION) # 转向空间
-ForwardDistance = 10.0 # 前进距离
+ForwardDistance = [5.0, 10.0] # 前进距离
 
 
 def rad_wrap(angle: float) -> float:
@@ -34,11 +34,11 @@ class Node:
     def __init__(self, x, y, heading, g_cost = 0, h_cost = 0, predecssor = None) -> None:
         self.x = x
         self.y = y
-        self.heading = heading
+        self.heading = rad_wrap(heading)
         self.g_cost = g_cost # 已经走过的路径代价（实际值）
         self.h_cost = h_cost # 到目标的估计代价（启发式值）
         self.predecssor = predecssor
-        assert -math.pi <= heading <= math.pi, "Heading must be in the range [-pi, pi]"
+        assert -math.pi <= self.heading <= math.pi, "Heading must be in the range [-pi, pi], but got {}".format(heading)
         
     def CalIndex1DWithAngle(self, width, height):
         min_heading = round(-math.pi / YAW_GRID_RESOLUTION) - 1
@@ -69,26 +69,28 @@ def GenerateSuccessors(node: Node, node_id: int) -> List[Node]:
     # delta_thetas = np.arange(-math.pi/4, math.pi/4 + 1e-6, 3* YAW_GRID_RESOLUTION)
     # delta_thetas = np.arange(-math.pi, math.pi + 1e-6, YAW_GRID_RESOLUTION)
     delta_thetas = DeltaThetas
-    distance = ForwardDistance # 前进距离
+    ForwardDistance # 前进距离
     
     for delta_theta in delta_thetas:
-        #  生成后继节点
-        # distance = 10.0 # 移动距离
-        # 1. 计算新的位置和航向(new_x, new_y, new_theta)
-        new_theta = rad_wrap(node.heading + delta_theta)  # 确保航向在[-pi, pi]范围内
-        new_x = node.x + distance * math.cos(new_theta)
-        new_y = node.y + distance * math.sin(new_theta)
-        
-        
-        # 2. 计算新节点的g_cost（new_g_cost根据路径长度，假如delta_theta不为0，则需要乘以一个转弯的惩罚系数如1.5）
-        new_node = Node(new_x, new_y, new_theta)
-        new_g_cost = node.g_cost + CalDubinPathCost(node, new_node)  # 使用Dubins路径代价
-        new_node.g_cost = new_g_cost
-        new_node.h_cost = node.h_cost  # 保持h_cost不变，后续会更新
-        new_node.predecssor = node_id  # 设置前驱节点为当前节点
-        
-        # 3. 创建新的后继节点
-        successors.append(new_node)
+        for distance in ForwardDistance:
+            #  生成后继节点
+            # distance = 10.0 # 移动距离
+            # 1. 计算新的位置和航向(new_x, new_y, new_theta)
+            new_theta = rad_wrap(node.heading + delta_theta)  # 确保航向在[-pi, pi]范围内
+            new_x = node.x + distance * math.cos(new_theta)
+            new_y = node.y + distance * math.sin(new_theta)
+            
+            
+            # 2. 计算新节点的g_cost（new_g_cost根据路径长度，假如delta_theta不为0，则需要乘以一个转弯的惩罚系数如1.5）
+            new_node = Node(new_x, new_y, new_theta)
+            new_node.g_cost = node.g_cost + distance  # 假设每个移动的代价为距离
+            # new_g_cost = node.g_cost + CalDubinPathCost(node, new_node)  # 使用Dubins路径代价
+            # new_node.g_cost = new_g_cost # 后续会更新
+            # new_node.h_cost = node.h_cost  # 保持h_cost不变，后续会更新
+            new_node.predecssor = node_id  # 设置前驱节点为当前节点
+            
+            # 3. 创建新的后继节点
+            successors.append(new_node)
     return successors
 
 def CalAStarPathCost(start_node: Node, h_map: dict, occupancy_map: occupancy_grid.OccupancyGrid) -> float:
@@ -365,8 +367,12 @@ class PathFindingAlgorithm:
                 if not collision_checker_.collision_check(successor_tuple, occupancy_map):
                     continue
                 
+                
+                
                 # 11. 如果找到更好的路径或节点不在开集中，则将后继节点加入开集
                 # 如果找到更好的路径或节点不在开集中，更新/添加节点到开集与队列中
+                # successor.g_cost = current.g_cost + ...  # 使用Dubins路径代价
+                # successor.g_cost = current.g_cost + CalDubinPathCost(current, successor)  # 使用Dubins路径代价
                 successor.h_cost = CalHCost(successor, goal_node, h_map, occupancy_map)
                 f_cost = cal_cost(successor, goal_node, h_map, occupancy_map)
                 if successor_idx_1d not in openList or f_cost < openList[successor_idx_1d].g_cost + openList[successor_idx_1d].h_cost:
