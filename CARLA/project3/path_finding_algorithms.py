@@ -14,7 +14,7 @@ YAW_GRID_RESOLUTION = np.deg2rad(5.0)
 DeltaThetas = np.arange(-math.pi/6, math.pi/6 + 1e-6,  2*YAW_GRID_RESOLUTION) # 转向空间
 # DeltaThetas = np.arange(-math.pi/4, math.pi/4 + 1e-6,  YAW_GRID_RESOLUTION) # 转向空间
 ForwardDistance = [4.0, 0.6] # 前进距离
-Radii = 3.0
+Radii = 2.0
 
 
 def rad_wrap(angle: float) -> float:
@@ -327,8 +327,11 @@ class PathFindingAlgorithm:
         # c_id = None
         # dubin_path = []
         # breakpoint()
+        max_try = 10000
 
-        while True:
+        # while True:
+        while max_try > 0:
+            max_try -= 1
             # 5. 如果openList为空，返回空路径
             # 如果openList为空，表示无法找到路径，返回空列表(return [])
             if not openList:
