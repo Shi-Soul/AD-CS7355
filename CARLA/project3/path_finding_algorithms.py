@@ -327,7 +327,7 @@ class PathFindingAlgorithm:
         # c_id = None
         # dubin_path = []
         # breakpoint()
-        max_try = 10000
+        max_try = 300000
 
         # while True:
         while max_try > 0:
@@ -388,6 +388,10 @@ class PathFindingAlgorithm:
                     heappush(pq, (f_cost, successor_idx_1d))
             # breakpoint()
                 
+        if max_try <= 0:
+            print("Warning: Max tries exceeded, returning empty path.")
+            return [(start_node.x, start_node.y, start_node.heading), (goal_node.x, goal_node.y, goal_node.heading)]
+                        
         # breakpoint()
         # 12. 定义从起始节点到目标节点获取最终路径的函数
         def get_final_path(closed_set: Dict[int, Node], dubin_path: List[Any], current_node: Node) -> List[Tuple[float, float, float]]:
