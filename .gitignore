@@ -7,4 +7,11 @@ CARLA_OD/torchOD/test_output3
 *.pdf
 
 *.pyc
-CARLA/
+
+CARLA/CarlaUE4
+CARLA/Engine
+CARLA/PythonAPI
+CARLA/Co-Simulation
+CARLA/HDMaps
+CARLA/Tools
+CARLA/carla-0-9-15-linux
