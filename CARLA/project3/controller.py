@@ -373,7 +373,8 @@ class Controller():
         args_longitudinal_dict = {'K_P': 1.0, 'K_I': 0.05, 'K_D': 0, 'dt': dt}
         max_throt = 0.75
         max_brake = 0.3
-        max_steer = 0.8
+        max_steer = 0.4
+        # max_steer = 0.8
         offset = 0
         base_min_distance = 3.0
         follow_speed_limits = False

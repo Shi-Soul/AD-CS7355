@@ -76,7 +76,7 @@ class LocalPlanner:
         return closest_index
     
     # 您应该自定义自己的偏移量（偏移量需要小于60米,注意过小的偏移量会导致局部路径过短而频繁重规划）
-    def choose_goal_cell(self, ego_position, ego_heading, offset = 20.0):
+    def choose_goal_cell(self, ego_position, ego_heading, offset = 50.0):
         """
         选择占用地图中的目标单元格。
         
@@ -175,6 +175,8 @@ class LocalPlanner:
             local_path.append((local_point_in_global[0], local_point_in_global[1], (point[2] + ego_heading - np.pi / 2.0) / np.pi * 180.0))
             
         self._local_path = local_path
+        
+        print(f"Local path found with {len(self._local_path)} points.")
 
     # 您应该自定义自己的距离阈值 (hint: 距离阈值过短，会导致频繁重规划)
     def need_to_recreate_occupancy_grid(self, ego_position, distance_threshold = 5.0):

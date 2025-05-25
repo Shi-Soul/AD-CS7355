@@ -11,6 +11,10 @@ from typing import Tuple, List, Dict, Any
 # 航向网格分辨率
 YAW_GRID_RESOLUTION = np.deg2rad(5.0)
 
+DeltaThetas = np.arange(-math.pi/4, math.pi/4 + 1e-6, 3* YAW_GRID_RESOLUTION) # 转向空间
+ForwardDistance = 10.0 # 前进距离
+
+
 def rad_wrap(angle: float) -> float:
     """
     将角度归一化到[-pi, pi]范围内。
@@ -62,12 +66,14 @@ def GenerateSuccessors(node: Node, node_id: int) -> List[Node]:
     
     # 定义转向空间
     # dela_thetas = [] # 角度值，例如 [-30, -15, 0, 15, 30] 角度制 注意转换为弧度制，同时delta_theta需要为YAW_GRID_RESOLUTION的倍数
-    delta_thetas = np.arange(-math.pi/4, math.pi/4 + 1e-6, 3* YAW_GRID_RESOLUTION)
+    # delta_thetas = np.arange(-math.pi/4, math.pi/4 + 1e-6, 3* YAW_GRID_RESOLUTION)
     # delta_thetas = np.arange(-math.pi, math.pi + 1e-6, YAW_GRID_RESOLUTION)
+    delta_thetas = DeltaThetas
+    distance = ForwardDistance # 前进距离
     
     for delta_theta in delta_thetas:
         #  生成后继节点
-        distance = 5.0 # 移动距离
+        # distance = 10.0 # 移动距离
         # 1. 计算新的位置和航向(new_x, new_y, new_theta)
         new_theta = rad_wrap(node.heading + delta_theta)  # 确保航向在[-pi, pi]范围内
         new_x = node.x + distance * math.cos(new_theta)
